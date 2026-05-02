@@ -9,16 +9,16 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Update & Install Base System (FAST)
+      - name: Update & Install System
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y xfce4 xfce4-goodies xrdp dbus-x11 x11-xserver-utils wget unzip
+          sudo apt-get install -y xfce4 xfce4-goodies xrdp dbus-x11 x11-xserver-utils curl
 
       - name: Setup XFCE + XRDP
         run: |
           echo "startxfce4" > ~/.xsession
 
-          # Disable lag (compositor OFF)
+          # Disable lag (no compositor)
           mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
           cat <<EOF > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
           <?xml version="1.0" encoding="UTF-8"?>
@@ -29,38 +29,38 @@ jobs:
           </channel>
           EOF
 
-          # Create your user
+          # Create user
           sudo useradd -m Aditya || true
           echo "Aditya:aditya*pro" | sudo chpasswd
           sudo usermod -aG sudo Aditya
 
-          # Also set runner password (backup)
+          # Backup user
           echo "runner:aditya*pro" | sudo chpasswd
 
-          # XRDP permissions
           sudo adduser xrdp ssl-cert
-
           sudo systemctl restart xrdp
 
-      - name: Install Ngrok
+      - name: Install Tailscale (manual)
         run: |
-          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
-          unzip ngrok-v3-stable-linux-amd64.zip
-          chmod +x ngrok
+          curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Start Ngrok Tunnel
+      - name: Connect Tailscale
         env:
-          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
         run: |
-          ./ngrok config add-authtoken $NGROK_AUTH_TOKEN
-          ./ngrok tcp 3389 > ngrok.log &
-          sleep 5
+          if [ -z "$TS_AUTHKEY" ]; then
+            echo "❌ ERROR: TAILSCALE_AUTHKEY missing!"
+            exit 1
+          fi
 
+          sudo tailscale up --authkey=$TS_AUTHKEY --hostname=github-runner --accept-routes
+
+      - name: Show Connection Info
+        run: |
           echo "--------------------------------------"
-          echo "🌐 REMOTE DESKTOP READY"
+          echo "🌐 CONNECT USING TAILSCALE IP"
           echo ""
-          echo "👉 Copy TCP address below:"
-          cat ngrok.log | grep "tcp://"
+          tailscale ip -4
           echo ""
           echo "👤 Username: Aditya"
           echo "🔑 Password: aditya*pro"
