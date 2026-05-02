@@ -16,7 +16,7 @@ jobs:
 
       - name: Create User
         run: |
-          net user Aditya "aditya*pro" /add
+          net user Aditya "Aditya*pro955" /add
           net localgroup administrators Aditya /add
 
       - name: Install Tailscale
@@ -35,7 +35,7 @@ jobs:
           Write-Host "RDP READY"
           Write-Host "IP: $ip"
           Write-Host "User: Aditya"
-          Write-Host "Pass: aditya*pro"
+          Write-Host "Pass: Aditya*pro955"
           Write-Host "Port: 3389"
           Write-Host "=============================="
 
