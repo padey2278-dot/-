@@ -9,16 +9,29 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Update & Install System
+      - name: Install Desktop + XRDP
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y xfce4 xfce4-goodies xrdp dbus-x11 x11-xserver-utils curl
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            xfce4 xfce4-goodies xfce4-session \
+            xrdp dbus-x11 x11-xserver-utils \
+            policykit-1 sudo curl
 
-      - name: Setup XFCE + XRDP
+      - name: Configure XFCE Session (FIX BLACK SCREEN)
         run: |
-          echo "startxfce4" > ~/.xsession
+          # Proper session script
+          cat <<'EOF' > ~/.xsession
+          #!/bin/bash
+          export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
+          startxfce4
+          EOF
+          chmod +x ~/.xsession
 
-          # Disable lag (no compositor)
+          # XRDP session hint
+          echo xfce4-session > ~/.xsessionrc
+
+          # Disable compositor (lag fix)
           mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
           cat <<EOF > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
           <?xml version="1.0" encoding="UTF-8"?>
@@ -29,18 +42,23 @@ jobs:
           </channel>
           EOF
 
-          # Create user
+      - name: Create User
+        run: |
           sudo useradd -m Aditya || true
           echo "Aditya:aditya*pro" | sudo chpasswd
           sudo usermod -aG sudo Aditya
 
-          # Backup user
+          # backup login
           echo "runner:aditya*pro" | sudo chpasswd
 
+      - name: Start Services
+        run: |
           sudo adduser xrdp ssl-cert
+          sudo systemctl daemon-reexec
+          sudo systemctl restart dbus
           sudo systemctl restart xrdp
 
-      - name: Install Tailscale (manual)
+      - name: Install Tailscale
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
 
@@ -49,21 +67,25 @@ jobs:
           TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
         run: |
           if [ -z "$TS_AUTHKEY" ]; then
-            echo "❌ ERROR: TAILSCALE_AUTHKEY missing!"
+            echo "❌ ERROR: TAILSCALE_AUTHKEY missing"
             exit 1
           fi
 
-          sudo tailscale up --authkey=$TS_AUTHKEY --hostname=github-runner --accept-routes
+          sudo tailscale up \
+            --authkey=$TS_AUTHKEY \
+            --hostname=github-xrdp \
+            --accept-routes
 
       - name: Show Connection Info
         run: |
           echo "--------------------------------------"
-          echo "🌐 CONNECT USING TAILSCALE IP"
+          echo "🌐 CONNECT VIA TAILSCALE"
           echo ""
           tailscale ip -4
           echo ""
           echo "👤 Username: Aditya"
           echo "🔑 Password: aditya*pro"
+          echo "Port: 3389"
           echo "--------------------------------------"
 
       - name: Keep Alive
