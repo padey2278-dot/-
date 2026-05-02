@@ -1,4 +1,4 @@
-name: Aditya-RDP-REAL-PRO
+name: Aditya-RDP-Final
 
 on:
   workflow_dispatch:
@@ -14,9 +14,9 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-      - name: Create User
+      - name: Create User (Policy Safe)
         run: |
-          net user Aditya "Aditya@Pro9555" /add
+          net user Aditya "Aditya@Royall955X!" /add
           net localgroup administrators Aditya /add
 
       - name: Install Tailscale
@@ -26,7 +26,12 @@ jobs:
 
       - name: Connect Tailscale
         run: |
-          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --accept-routes
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes
+
+      # 👉 Use this ONLY if you get tag error
+      # - name: Connect Tailscale (Tagged Fix)
+      #   run: |
+      #     & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --advertise-tags=tag:server --accept-routes
 
       - name: Show Connection Info
         run: |
@@ -35,7 +40,7 @@ jobs:
           Write-Host "RDP READY"
           Write-Host "IP: $ip"
           Write-Host "User: Aditya"
-          Write-Host "Pass: Aditya@Pro9555"
+          Write-Host "Pass: Aditya@Royall955X!"
           Write-Host "Port: 3389"
           Write-Host "=============================="
 
