@@ -1,37 +1,24 @@
 name: CI-Cloud-Environment
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # max allowed (6 hours)
+    timeout-minutes: 360
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Desktop & Apps
+      - name: Update & Install Base System (FAST)
         run: |
-          sudo apt-get update
+          sudo apt-get update -y
+          sudo apt-get install -y xfce4 xfce4-goodies xrdp dbus-x11 x11-xserver-utils wget unzip
 
-          # Install XFCE + XRDP + apps
-          sudo apt-get install -y \
-            xfce4 xfce4-goodies \
-            xrdp \
-            dbus-x11 x11-xserver-utils \
-            libreoffice firefox vlc gimp gnome-calculator
-
-          # Fix session start
+      - name: Setup XFCE + XRDP
+        run: |
           echo "startxfce4" > ~/.xsession
 
-          # Disable compositor (fix lag/wavy effect)
+          # Disable lag (compositor OFF)
           mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
           cat <<EOF > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
           <?xml version="1.0" encoding="UTF-8"?>
@@ -42,5 +29,42 @@ jobs:
           </channel>
           EOF
 
-          # Set password for runner user
-          echo "runner:password123" | sudo
+          # Create your user
+          sudo useradd -m Aditya || true
+          echo "Aditya:aditya*pro" | sudo chpasswd
+          sudo usermod -aG sudo Aditya
+
+          # Also set runner password (backup)
+          echo "runner:aditya*pro" | sudo chpasswd
+
+          # XRDP permissions
+          sudo adduser xrdp ssl-cert
+
+          sudo systemctl restart xrdp
+
+      - name: Install Ngrok
+        run: |
+          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+          unzip ngrok-v3-stable-linux-amd64.zip
+          chmod +x ngrok
+
+      - name: Start Ngrok Tunnel
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          ./ngrok config add-authtoken $NGROK_AUTH_TOKEN
+          ./ngrok tcp 3389 > ngrok.log &
+          sleep 5
+
+          echo "--------------------------------------"
+          echo "🌐 REMOTE DESKTOP READY"
+          echo ""
+          echo "👉 Copy TCP address below:"
+          cat ngrok.log | grep "tcp://"
+          echo ""
+          echo "👤 Username: Aditya"
+          echo "🔑 Password: aditya*pro"
+          echo "--------------------------------------"
+
+      - name: Keep Alive
+        run: sleep 21600
