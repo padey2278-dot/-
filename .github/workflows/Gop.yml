@@ -1,4 +1,4 @@
-name: Aditya-RDP-Runner
+name: Aditya-RDP-Final-Working
 
 on:
   workflow_dispatch:
@@ -14,10 +14,10 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-      - name: Try Set Runner Password
-        continue-on-error: true
+      - name: Create Working User
         run: |
-          net user runner "Runner@1234!"
+          net user Aditya "X9@Lm2#Qp7Zk!" /add
+          net localgroup administrators Aditya /add
 
       - name: Install Tailscale
         run: |
@@ -28,15 +28,14 @@ jobs:
         run: |
           & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes
 
-      - name: Show Connection Info
+      - name: Show Info
         run: |
           $ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
           Write-Host "=============================="
           Write-Host "RDP READY"
           Write-Host "IP: $ip"
-          Write-Host "User: runner"
-          Write-Host "Pass: Runner@1234! (if applied)"
-          Write-Host "Port: 3389"
+          Write-Host "User: Aditya"
+          Write-Host "Pass: X9@Lm2#Qp7Zk!"
           Write-Host "=============================="
 
       - name: Keep Alive
