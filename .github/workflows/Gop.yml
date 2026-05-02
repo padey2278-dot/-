@@ -1,59 +1,47 @@
-name: Quick-RDP-Tailscale
+name: Aditya-RDP-REAL-PRO
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 360
 
     steps:
-      - name: Install Desktop (FAST)
+      - name: Enable RDP
         run: |
-          sudo apt-get update -y
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            xfce4 xfce4-session xrdp dbus-x11 curl
-
-      - name: Fix Session (NO BLACK SCREEN)
-        run: |
-          echo "startxfce4" > ~/.xsession
-          chmod +x ~/.xsession
-          echo xfce4-session > ~/.xsessionrc
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
       - name: Create User
         run: |
-          sudo useradd -m Aditya || true
-          echo "Aditya:aditya*pro" | sudo chpasswd
-          echo "runner:aditya*pro" | sudo chpasswd
-
-      - name: Start XRDP (FIXED)
-        run: |
-          sudo adduser xrdp ssl-cert || true
-          sudo systemctl stop xrdp || true
-          sudo systemctl start xrdp
+          net user Aditya "aditya*pro" /add
+          net localgroup administrators Aditya /add
 
       - name: Install Tailscale
-        run: curl -fsSL https://tailscale.com/install.sh | sh
+        run: |
+          Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile ts.exe
+          Start-Process ts.exe -ArgumentList "/quiet" -Wait
 
       - name: Connect Tailscale
-        env:
-          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
         run: |
-          if [ -z "$TS_AUTHKEY" ]; then
-            echo "❌ Add TAILSCALE_AUTHKEY in repo secrets"
-            exit 1
-          fi
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --accept-routes
 
-          sudo tailscale up --authkey=$TS_AUTHKEY --hostname=rdp-fast
-
-      - name: Show Info
+      - name: Show Connection Info
         run: |
-          echo "====== CONNECT FAST ======"
-          tailscale ip -4
-          echo "User: Aditya"
-          echo "Pass: aditya*pro"
-          echo "Port: 3389"
+          $ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "=============================="
+          Write-Host "RDP READY"
+          Write-Host "IP: $ip"
+          Write-Host "User: Aditya"
+          Write-Host "Pass: aditya*pro"
+          Write-Host "Port: 3389"
+          Write-Host "=============================="
 
       - name: Keep Alive
-        run: sleep 21600
+        run: |
+          while ($true) {
+            Write-Host "Alive..."
+            Start-Sleep -Seconds 60
+          }
