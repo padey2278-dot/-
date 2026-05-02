@@ -2,63 +2,45 @@ name: CI-Cloud-Environment
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Auto-restarts every 6 hours
-  workflow_dispatch:      # Allows you to start it manually
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 360   # max allowed (6 hours)
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install System & Office Apps
+      - name: Install Desktop & Apps
         run: |
           sudo apt-get update
-          # Install Desktop (XFCE), Remote Engine (XRDP), and Real Apps
-          sudo apt-get install -y xfce4 xfce4-goodies xrdp libreoffice firefox vlc gimp gnome-calculator
-          
-          # --- FIX THE WAVY 🌊 EFFECT (Performance Tweak) ---
-          # This disables the compositor to stop lag and "wavy" window movement
+
+          # Install XFCE + XRDP + apps
+          sudo apt-get install -y \
+            xfce4 xfce4-goodies \
+            xrdp \
+            dbus-x11 x11-xserver-utils \
+            libreoffice firefox vlc gimp gnome-calculator
+
+          # Fix session start
+          echo "startxfce4" > ~/.xsession
+
+          # Disable compositor (fix lag/wavy effect)
           mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
           cat <<EOF > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <channel name="xfwm4" version="1.0">
             <property name="general" type="empty">
               <property name="use_compositing" type="bool" value="false"/>
-              <property name="draw_frame" type="bool" value="true"/>
-              <property name="box_move" type="bool" value="true"/>
             </property>
           </channel>
           EOF
 
-          # Configure User & Session
-          sudo adduser xrdp ssl-cert
-          echo "exec startxfce4" > ~/.xsession
-          echo "runner:password123" | sudo chpasswd
-          sudo systemctl restart xrdp
-
-      - name: Secure Network Layer
-        uses: tailscale/github-action@v2
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-
-      - name: Prevent Auto-Disable
-        uses: gautamkrishnar/keepalive-workflow@v2
-
-      - name: Finalize & Connection Info
-        run: |
-          echo "--------------------------------------------"
-          echo "STATUS: SYSTEM ONLINE"
-          echo "Tailscale IP:"
-          tailscale ip -4
-          echo "User: Aditya"
-          echo "Pass: Aditya*pro"
-          echo "--------------------------------------------"
-          # Keeps the machine alive for the 6-hour GitHub limit
-          sleep 21600
-          
+          # Set password for runner user
+          echo "runner:password123" | sudo
