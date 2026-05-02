@@ -1,13 +1,7 @@
-name: CI-Cloud-Environment
+name: Cloud-PC
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
-  actions: write
 
 jobs:
   build:
@@ -17,56 +11,69 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Persisted Data
+      # ----------------------------
+      # ⚡ Install Lightweight Desktop
+      # ----------------------------
+      - name: Install Desktop + noVNC
         run: |
-          if [ -f data.tar.gz ]; then
-            tar -xzf data.tar.gz -C ~/
-          fi
+          sudo apt-get update
+          sudo apt-get install -y xfce4 xfce4-terminal tightvncserver novnc websockify
 
-      - name: Install Apps from Repository
+      # ----------------------------
+      # 🖥️ Setup VNC
+      # ----------------------------
+      - name: Setup VNC Server
         run: |
-          chmod +x ./install-apps.sh
-          ./install-apps.sh
+          mkdir -p ~/.vnc
+          echo "password123" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
 
-      - name: Configure Desktop Performance
-        run: |
-          mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
-          cat <<EOF > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
-          <?xml version="1.0" encoding="UTF-8"?>
-          <channel name="xfwm4" version="1.0">
-            <property name="general" type="empty">
-              <property name="use_compositing" type="bool" value="false"/>
-              <property name="draw_frame" type="bool" value="true"/>
-              <property name="box_move" type="bool" value="true"/>
-            </property>
-          </channel>
+          cat <<EOF > ~/.vnc/xstartup
+          #!/bin/bash
+          startxfce4 &
           EOF
 
-      # ✅ FIXED STEP (separate uses)
+          chmod +x ~/.vnc/xstartup
+
+      # ----------------------------
+      # 🚀 Start Desktop
+      # ----------------------------
+      - name: Start Desktop
+        run: |
+          vncserver :1 -geometry 1280x720 -depth 24
+
+      # ----------------------------
+      # 🌐 Start noVNC (browser access)
+      # ----------------------------
+      - name: Start noVNC
+        run: |
+          websockify --web=/usr/share/novnc/ 6080 localhost:5901 &
+      
+      # ----------------------------
+      # 🌍 Setup Tailscale (PRIVATE ACCESS)
+      # ----------------------------
       - name: Setup Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Prevent Auto-Disable
-        uses: gautamkrishnar/keepalive-workflow@v2
-
-      - name: Save Persisted Data
+      # ----------------------------
+      # 📡 Show connection info
+      # ----------------------------
+      - name: Connection Info
         run: |
-          tar -czf data.tar.gz -C ~/ .
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data.tar.gz
-          git commit -m "Persist user data" || echo "No changes"
-          git push
+          echo "=============================="
+          echo "🌐 noVNC URL:"
+          echo "http://<TAILSCALE-IP>:6080/vnc.html"
+          echo ""
+          echo "🔐 Password: password123"
+          echo ""
+          echo "📡 Tailscale IP:"
+          tailscale ip -4
+          echo "=============================="
 
-      - name: Finalize & Connection Info
-        run: |
-          echo "--------------------------------------------"
-          echo "STATUS: SYSTEM ONLINE"
-          echo "Tailscale IP:"
-          tailscale ip -4 || echo "Tailscale not ready"
-          echo "User: runner"
-          echo "Pass: password123"
-          echo "--------------------------------------------"
-          sleep 21600
+      # ----------------------------
+      # ⏳ Keep alive (6 hours max)
+      # ----------------------------
+      - name: Keep Alive
+        run: sleep 21600
